@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validCategory(categoryId) {
+      return categoryId in ['shirts', 'pants', 'track-pants', 'track-shirts'];
+    }
+
+    function validCounts(data) {
+      return data.keys().hasAll(['received', 'sold', 'updatedAt'])
+        && data.received is int
+        && data.sold is int
+        && data.received >= 0
+        && data.sold >= 0
+        && data.sold <= data.received;
+    }
+
+    match /inventory/{categoryId} {
+      allow read: if signedIn() && validCategory(categoryId);
+      allow create: if signedIn()
+        && validCategory(categoryId)
+        && validCounts(request.resource.data)
+        && request.resource.data.received == 1
+        && request.resource.data.sold == 0;
+      allow update: if signedIn()
+        && validCategory(categoryId)
+        && validCounts(request.resource.data)
+        && (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['received', 'updatedAt'])
+            && request.resource.data.received == resource.data.received + 1
+            && request.resource.data.sold == resource.data.sold
+          )
+          ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sold', 'updatedAt'])
+            && request.resource.data.sold == resource.data.sold + 1
+            && request.resource.data.received == resource.data.received
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /movements/{movementId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['category', 'type', 'barcode', 'createdAt'])
+        && validCategory(request.resource.data.category)
+        && request.resource.data.type in ['received', 'sold']
+        && request.resource.data.barcode is string
+        && request.resource.data.barcode.size() > 0
+        && request.resource.data.barcode.size() <= 128;
+      allow update, delete: if false;
+    }
+  }
+}

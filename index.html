@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#17251e" />
+    <title>Thread &amp; Needle | Inventory</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Thread and Needle home">
+          <span class="brand-mark" aria-hidden="true">T</span>
+          <span>THREAD <span class="brand-amp">&amp;</span> NEEDLE</span>
+        </a>
+        <button id="sign-out-button" class="button button-quiet hidden" type="button">Sign out</button>
+      </header>
+
+      <section id="auth-view" class="auth-layout">
+        <div class="auth-copy">
+          <p class="eyebrow">YOUR STORE, IN SYNC</p>
+          <h1>Keep your stock<br />in good hands.</h1>
+          <p class="muted">Scan items in and out. See what is on the shelf, wherever you are.</p>
+          <div class="auth-decoration" aria-hidden="true">
+            <span class="thread-line"></span>
+            <span class="thread-dot"></span>
+            <span class="thread-line short"></span>
+          </div>
+        </div>
+        <div class="panel auth-panel">
+          <p class="eyebrow" id="auth-eyebrow">WELCOME BACK</p>
+          <h2 id="auth-title">Sign in</h2>
+          <p class="muted" id="auth-description">Sign in to manage your store inventory.</p>
+          <form id="auth-form">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourstore.com" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="At least 6 characters" required />
+            <button id="auth-submit" class="button button-primary full-width" type="submit">Sign in</button>
+          </form>
+          <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+          <p class="switch-auth">
+            <span id="auth-switch-prompt">New to your store?</span>
+            <button id="auth-switch" class="text-button" type="button">Create an account</button>
+          </p>
+        </div>
+      </section>
+
+      <section id="dashboard-view" class="content-view hidden">
+        <div class="page-heading">
+          <p class="eyebrow">STORE INVENTORY</p>
+          <h1>What would you like to do?</h1>
+          <p class="muted">Choose an action to update or check your stock.</p>
+        </div>
+        <div class="action-grid">
+          <button class="action-card" data-action="stock-in" type="button">
+            <span class="card-icon icon-in" aria-hidden="true">↓</span>
+            <span class="card-number">01 / STOCK IN</span>
+            <span class="card-title">Scan stock</span>
+            <span class="card-description">Add incoming items by barcode.</span>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="action-card" data-action="stock-out" type="button">
+            <span class="card-icon icon-out" aria-hidden="true">↑</span>
+            <span class="card-number">02 / SALES</span>
+            <span class="card-title">Sale</span>
+            <span class="card-description">Record sold items by barcode.</span>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="action-card" data-action="stock-view" type="button">
+            <span class="card-icon icon-view" aria-hidden="true">▤</span>
+            <span class="card-number">03 / OVERVIEW</span>
+            <span class="card-title">Stock quantity</span>
+            <span class="card-description">See received, sold, and remaining.</span>
+            <span class="card-arrow" aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="category-view" class="content-view hidden">
+        <button class="back-button" data-back="dashboard" type="button"><span aria-hidden="true">←</span> Back</button>
+        <div class="page-heading compact-heading">
+          <p class="eyebrow" id="category-mode-label">STOCK IN</p>
+          <h1>Choose a category</h1>
+          <p class="muted">Select the type of clothing you are scanning.</p>
+        </div>
+        <div id="category-grid" class="category-grid"></div>
+      </section>
+
+      <section id="scanner-view" class="content-view hidden">
+        <button class="back-button" data-back="categories" type="button"><span aria-hidden="true">←</span> Back</button>
+        <div class="scanner-layout">
+          <div>
+            <p class="eyebrow" id="scanner-mode-label">STOCK IN</p>
+            <h1 id="scanner-title">Scan a product</h1>
+            <p class="muted">Category: <strong id="scanner-category"></strong></p>
+            <p class="scan-help">Hold the barcode inside the camera frame. Each successful scan records one item.</p>
+            <button id="camera-button" class="button button-primary" type="button">Open camera</button>
+            <p id="scan-message" class="message" role="status" aria-live="polite"></p>
+          </div>
+          <div class="camera-frame">
+            <video id="camera-video" playsinline muted aria-label="Barcode scanner camera"></video>
+            <div id="camera-placeholder" class="camera-placeholder">
+              <span class="camera-glyph" aria-hidden="true">▣</span>
+              <span>Your camera preview will appear here</span>
+            </div>
+            <span class="scan-corner corner-tl" aria-hidden="true"></span>
+            <span class="scan-corner corner-tr" aria-hidden="true"></span>
+            <span class="scan-corner corner-bl" aria-hidden="true"></span>
+            <span class="scan-corner corner-br" aria-hidden="true"></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="stock-view" class="content-view hidden">
+        <button class="back-button" data-back="dashboard" type="button"><span aria-hidden="true">←</span> Back</button>
+        <div class="page-heading compact-heading">
+          <p class="eyebrow">LIVE INVENTORY</p>
+          <h1>Stock quantity</h1>
+          <p class="muted">Totals update automatically when anyone records a scan.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Category</th>
+                <th scope="col">Scanned in</th>
+                <th scope="col">Sold</th>
+                <th scope="col">In stock</th>
+              </tr>
+            </thead>
+            <tbody id="stock-table-body"></tbody>
+          </table>
+        </div>
+        <p id="stock-message" class="message" role="status" aria-live="polite"></p>
+      </section>
+
+      <footer class="footer"><span>THREAD &amp; NEEDLE</span><span>Inventory made simple.</span></footer>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
