@@ -1,5 +1,3 @@
-import { firebaseConfig } from "./firebase-config.js";
-
 const categories = [
   { id: "shirts", name: "Shirts" },
   { id: "pants", name: "Pants" },
@@ -8,17 +6,11 @@ const categories = [
 ];
 
 const views = {
-  auth: document.querySelector("#auth-view"),
   dashboard: document.querySelector("#dashboard-view"),
   categories: document.querySelector("#category-view"),
   scanner: document.querySelector("#scanner-view"),
   stock: document.querySelector("#stock-view"),
 };
-const authForm = document.querySelector("#auth-form");
-const authMessage = document.querySelector("#auth-message");
-const authSwitch = document.querySelector("#auth-switch");
-const authSubmit = document.querySelector("#auth-submit");
-const passwordInput = document.querySelector("#password");
 const cameraButton = document.querySelector("#camera-button");
 const video = document.querySelector("#camera-video");
 const cameraPlaceholder = document.querySelector("#camera-placeholder");
@@ -26,20 +18,22 @@ const scanMessage = document.querySelector("#scan-message");
 const categoryGrid = document.querySelector("#category-grid");
 const stockTableBody = document.querySelector("#stock-table-body");
 const stockMessage = document.querySelector("#stock-message");
+const inventoryStorageKey = "ak-faction-inventory-v1";
 const signOutButton = document.querySelector("#sign-out-button");
-
-let auth;
-let db;
-let firebaseAuth;
-let firestore;
-let registering = false;
 let activeMode = "stock-in";
 let activeCategory;
-let cameraControls;
 let cameraStream;
-let stockUnsubscribe;
+let cameraControls;
+let barcodeDetector;
+let cameraAnimationFrame;
 let scannerBusy = false;
 let lastScanAt = 0;
+let inventory = createEmptyInventory();
+let storageError;
+
+function createEmptyInventory() {
+  return Object.fromEntries(categories.map(({ id }) => [id, { received: 0, sold: 0 }]));
+}
 
 function showView(name) {
   for (const [viewName, element] of Object.entries(views)) {
@@ -52,71 +46,71 @@ function setMessage(element, text, isError = false) {
   element.classList.toggle("error", isError);
 }
 
-function friendlyAuthError(error) {
-  const messages = {
-    "auth/email-already-in-use": "An account already exists for this email. Please sign in.",
-    "auth/invalid-email": "Enter a valid email address.",
-    "auth/invalid-credential": "Email or password is incorrect.",
-    "auth/weak-password": "Choose a password with at least 6 characters.",
-    "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
-    "auth/network-request-failed": "Network error. Check your connection and try again.",
-  };
-  return messages[error.code] ?? "Sign-in could not be completed. Please try again.";
-}
-
-function renderAuthMode() {
-  document.querySelector("#auth-eyebrow").textContent = registering ? "CREATE YOUR ACCOUNT" : "WELCOME BACK";
-  document.querySelector("#auth-title").textContent = registering ? "Create account" : "Sign in";
-  document.querySelector("#auth-description").textContent = registering
-    ? "Register with your email to access the store inventory."
-    : "Sign in to manage your store inventory.";
-  document.querySelector("#auth-switch-prompt").textContent = registering ? "Already registered?" : "New to your store?";
-  authSwitch.textContent = registering ? "Sign in" : "Create an account";
-  authSubmit.textContent = registering ? "Create account" : "Sign in";
-  passwordInput.autocomplete = registering ? "new-password" : "current-password";
-  setMessage(authMessage, "");
-}
-
 function renderCategories() {
   categoryGrid.replaceChildren(...categories.map((category, index) => {
     const button = document.createElement("button");
     button.className = "category-card";
     button.type = "button";
     button.dataset.category = category.id;
+    button.addEventListener("click", () => openScanner(category));
     button.innerHTML = `<span class="category-index">0${index + 1} / CATEGORY</span><span class="category-name"></span><span class="category-arrow" aria-hidden="true">↗</span>`;
     button.querySelector(".category-name").textContent = category.name;
     return button;
   }));
 }
 
-function startStockListener() {
-  stockUnsubscribe?.();
-  stockUnsubscribe = firestore.onSnapshot(firestore.collection(db, "inventory"), (snapshot) => {
-    const stockById = new Map(snapshot.docs.map((entry) => [entry.id, entry.data()]));
-    stockTableBody.replaceChildren(...categories.map((category) => {
-      const stock = stockById.get(category.id) ?? { received: 0, sold: 0 };
-      const row = document.createElement("tr");
-      const values = [
-        category.name,
-        Number(stock.received ?? 0),
-        Number(stock.sold ?? 0),
-        Number(stock.received ?? 0) - Number(stock.sold ?? 0),
-      ];
-      for (const value of values) {
-        const cell = document.createElement("td");
-        cell.textContent = String(value);
-        row.append(cell);
+function renderStock() {
+  stockTableBody.replaceChildren(...categories.map((category) => {
+    const stock = inventory[category.id];
+    const row = document.createElement("tr");
+    const values = [
+      category.name,
+      stock.received,
+      stock.sold,
+      stock.received - stock.sold,
+    ];
+    for (const value of values) {
+      const cell = document.createElement("td");
+      cell.textContent = String(value);
+      row.append(cell);
+    }
+    return row;
+  }));
+  setMessage(
+    stockMessage,
+    storageError ?? "Changes are saved in this browser on this device.",
+    Boolean(storageError),
+  );
+}
+
+function loadInventory() {
+  try {
+    const savedInventory = localStorage.getItem(inventoryStorageKey);
+    if (!savedInventory) return;
+
+    const parsedInventory = JSON.parse(savedInventory);
+    const loadedInventory = createEmptyInventory();
+    for (const { id } of categories) {
+      const stock = parsedInventory[id];
+      if (!stock || !Number.isSafeInteger(stock.received) || !Number.isSafeInteger(stock.sold)
+        || stock.received < 0 || stock.sold < 0 || stock.sold > stock.received) {
+        throw new Error(`Saved inventory data for ${id} is invalid.`);
       }
-      return row;
-    }));
-    setMessage(stockMessage, "");
-  }, (error) => {
-    console.error("Could not load inventory:", error);
-    setMessage(stockMessage, "Inventory could not be loaded. Check your connection or database setup.", true);
-  });
+      loadedInventory[id] = { received: stock.received, sold: stock.sold };
+    }
+    inventory = loadedInventory;
+  } catch (error) {
+    console.error("Could not load local inventory:", error);
+    storageError = "Saved inventory could not be read. Clear this site's browser data to start fresh.";
+  }
 }
 
 function stopCamera() {
+  if (cameraAnimationFrame !== undefined) {
+    cancelAnimationFrame(cameraAnimationFrame);
+    cameraAnimationFrame = undefined;
+  }
+  barcodeDetector = undefined;
   cameraControls?.stop();
   cameraControls = undefined;
   if (cameraStream) {
@@ -141,49 +135,58 @@ function openScanner(category) {
   showView("scanner");
 }
 
-async function recordScan(barcode) {
-  const categoryRef = firestore.doc(db, "inventory", activeCategory.id);
-  const movementRef = firestore.doc(firestore.collection(db, "movements"));
-  const field = activeMode === "stock-in" ? "received" : "sold";
-
-  await firestore.runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(categoryRef);
-    const stock = snapshot.exists() ? snapshot.data() : { received: 0, sold: 0 };
-    const received = Number(stock.received ?? 0);
-    const sold = Number(stock.sold ?? 0);
-
-    if (field === "sold" && received - sold < 1) {
-      throw new Error("NO_STOCK_AVAILABLE");
-    }
-
-    transaction.set(categoryRef, {
-      received: field === "received" ? received + 1 : received,
-      sold: field === "sold" ? sold + 1 : sold,
-      updatedAt: firestore.serverTimestamp(),
-    });
-    transaction.set(movementRef, {
-      category: activeCategory.id,
-      type: field,
-      barcode,
-      createdAt: firestore.serverTimestamp(),
-    });
-  });
+function openAction(action) {
+  if (action === "stock-view") {
+    showView("stock");
+    return;
+  }
+  activeMode = action;
+  document.querySelector("#category-mode-label").textContent = action === "stock-in" ? "STOCK IN" : "SALE";
+  showView("categories");
 }
 
-async function onBarcodeDetected(barcode) {
+function goBack(view) {
+  stopCamera();
+  showView(view);
+}
+
+function recordScan() {
+  if (storageError) throw new Error("LOCAL_STORAGE_UNAVAILABLE");
+  const field = activeMode === "stock-in" ? "received" : "sold";
+  const stock = inventory[activeCategory.id];
+  if (field === "sold" && stock.received - stock.sold < 1) {
+    throw new Error("NO_STOCK_AVAILABLE");
+  }
+  const updatedStock = {
+    ...stock,
+    [field]: stock[field] + 1,
+  };
+  const updatedInventory = { ...inventory, [activeCategory.id]: updatedStock };
+  localStorage.setItem(inventoryStorageKey, JSON.stringify(updatedInventory));
+  inventory = updatedInventory;
+  renderStock();
+}
+
+async function onBarcodeDetected() {
   if (scannerBusy) return;
   scannerBusy = true;
   stopCamera();
   setMessage(scanMessage, activeMode === "stock-in" ? "Adding item to stock…" : "Recording sale…");
   try {
-    await recordScan(barcode);
+    recordScan();
     setMessage(scanMessage, activeMode === "stock-in" ? "Added to stock." : "Sale recorded.");
   } catch (error) {
     if (error.message === "NO_STOCK_AVAILABLE") {
       setMessage(scanMessage, "No items of this category are in stock to sell.", true);
     } else {
       console.error("Could not save barcode scan:", error);
-      setMessage(scanMessage, "The scan could not be saved. Check your connection and try again.", true);
+      setMessage(
+        scanMessage,
+        error.message === "LOCAL_STORAGE_UNAVAILABLE"
+          ? storageError
+          : "The scan could not be saved in this browser.",
+        true,
+      );
     }
   } finally {
     scannerBusy = false;
@@ -201,137 +204,93 @@ async function startCamera() {
   setMessage(scanMessage, "");
 
   try {
-    const { BrowserMultiFormatReader } = await import("https://esm.sh/@zxing/browser@0.1.5");
-    const reader = new BrowserMultiFormatReader();
-    cameraControls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
-      if (!result) return;
-      const now = Date.now();
-      if (now - lastScanAt < 1200) return;
-      lastScanAt = now;
-      void onBarcodeDetected(result.getText());
-    });
+    let formats = [];
+    if (typeof window.BarcodeDetector === "function"
+      && typeof window.BarcodeDetector.getSupportedFormats === "function") {
+      try {
+        const supportedFormats = await window.BarcodeDetector.getSupportedFormats();
+        formats = supportedFormats.filter((format) => [
+          "code_39", "code_128", "ean_8", "ean_13", "itf", "upc_a", "upc_e",
+        ].includes(format));
+      } catch (error) {
+        console.warn("Native barcode detection is unavailable; using the ZXing fallback:", error);
+      }
+    }
+    if (formats.length > 0) {
+      barcodeDetector = new window.BarcodeDetector({ formats });
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" } },
+      });
+      video.srcObject = cameraStream;
+      await video.play();
+      void scanVideoFrame();
+    } else {
+      const BrowserMultiFormatReader = window.ZXingBrowser?.BrowserMultiFormatReader;
+      if (!BrowserMultiFormatReader) {
+        throw new Error("SCANNER_LIBRARY_UNAVAILABLE");
+      }
+      const reader = new BrowserMultiFormatReader();
+      cameraControls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
+        if (!result || scannerBusy) return;
+        const now = Date.now();
+        if (now - lastScanAt < 1200) return;
+        lastScanAt = now;
+        void onBarcodeDetected();
+      });
+    }
     video.classList.remove("hidden");
     cameraPlaceholder.classList.add("hidden");
     cameraButton.textContent = "Camera is on";
   } catch (error) {
     stopCamera();
     console.error("Could not start barcode scanner:", error);
-    const message = error.name === "NotAllowedError"
-      ? "Camera permission was denied. Allow camera access in your browser and try again."
-      : error.name === "NotFoundError"
-        ? "No camera was found on this device."
-        : "Camera or barcode scanner could not start. Open the hosted app over HTTPS and try again.";
+    const message = error.message === "SCANNER_LIBRARY_UNAVAILABLE"
+      ? "The barcode scanner library could not be loaded. Reinstall dependencies with npm install, then reload the app."
+      : error.name === "NotAllowedError"
+        ? "Camera permission was denied. Allow camera access in your browser and try again."
+        : error.name === "NotFoundError"
+          ? "No camera was found on this device."
+          : "Camera or barcode scanner could not start. Open the app on localhost or over HTTPS and try again.";
     setMessage(scanMessage, message, true);
   }
 }
 
-function firebaseIsConfigured() {
-  return firebaseConfig.apiKey !== "YOUR_API_KEY"
-    && firebaseConfig.projectId !== "YOUR_PROJECT_ID"
-    && firebaseConfig.appId !== "YOUR_APP_ID";
+async function scanVideoFrame() {
+  if (!cameraStream || !barcodeDetector) return;
+  try {
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !scannerBusy) {
+      const results = await barcodeDetector.detect(video);
+      if (results.length > 0) {
+        const now = Date.now();
+        if (now - lastScanAt >= 1200) {
+          lastScanAt = now;
+          void onBarcodeDetected();
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Could not scan camera frame:", error);
+    stopCamera();
+    setMessage(scanMessage, "Could not read the camera image. Close and reopen the camera to try again.", true);
+    return;
+  }
+  if (cameraStream && barcodeDetector) {
+    cameraAnimationFrame = requestAnimationFrame(() => void scanVideoFrame());
+  }
 }
 
-authSwitch.addEventListener("click", () => {
-  registering = !registering;
-  renderAuthMode();
-});
-
-authForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!firebaseIsConfigured()) {
-    setMessage(authMessage, "Firebase is not configured yet. Follow the setup steps in README.md.", true);
-    return;
-  }
-  if (!auth) {
-    setMessage(authMessage, "Firebase is still connecting. Please try again in a moment.", true);
-    return;
-  }
-  const email = new FormData(authForm).get("email").toString().trim();
-  const password = new FormData(authForm).get("password").toString();
-  authSubmit.disabled = true;
-  setMessage(authMessage, registering ? "Creating your account…" : "Signing in…");
+cameraButton.addEventListener("click", () => void startCamera());
+signOutButton.addEventListener("click", () => {
   try {
-    if (registering) {
-      await firebaseAuth.createUserWithEmailAndPassword(auth, email, password);
-    } else {
-      await firebaseAuth.signInWithEmailAndPassword(auth, email, password);
-    }
-  } catch (error) {
-    setMessage(authMessage, friendlyAuthError(error), true);
-  } finally {
-    authSubmit.disabled = false;
-  }
-});
-
-signOutButton.addEventListener("click", async () => {
-  try {
-    stopCamera();
-    await firebaseAuth.signOut(auth);
+    sessionStorage.removeItem("ar-factions-session");
+    window.location.replace("./login.html");
   } catch (error) {
     console.error("Could not sign out:", error);
-    setMessage(authMessage, "Could not sign out. Please try again.", true);
+    alert("Could not sign out. Close this tab and reopen the app.");
   }
-});
-
-document.querySelectorAll("[data-action]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (button.dataset.action === "stock-view") {
-      showView("stock");
-      return;
-    }
-    activeMode = button.dataset.action;
-    document.querySelector("#category-mode-label").textContent = activeMode === "stock-in" ? "STOCK IN" : "SALE";
-    showView("categories");
-  });
-});
-
-categoryGrid.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-category]");
-  const category = categories.find((entry) => entry.id === button?.dataset.category);
-  if (category) openScanner(category);
-});
-
-cameraButton.addEventListener("click", () => void startCamera());
-
-document.querySelectorAll("[data-back]").forEach((button) => {
-  button.addEventListener("click", () => {
-    stopCamera();
-    showView(button.dataset.back);
-  });
 });
 
 renderCategories();
-renderAuthMode();
-
-if (firebaseIsConfigured()) {
-  setMessage(authMessage, "Connecting to Firebase…");
-  Promise.all([
-    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
-    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js"),
-    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js"),
-  ]).then(([appSdk, authSdk, firestoreSdk]) => {
-    firebaseAuth = authSdk;
-    firestore = firestoreSdk;
-    const firebaseApp = appSdk.initializeApp(firebaseConfig);
-    auth = authSdk.getAuth(firebaseApp);
-    db = firestoreSdk.getFirestore(firebaseApp);
-    authSdk.onAuthStateChanged(auth, (user) => {
-      if (user) {
-        signOutButton.classList.remove("hidden");
-        startStockListener();
-        showView("dashboard");
-      } else {
-        stockUnsubscribe?.();
-        stockUnsubscribe = undefined;
-        signOutButton.classList.add("hidden");
-        stopCamera();
-        showView("auth");
-      }
-    });
-  }).catch((error) => {
-    console.error("Could not load Firebase:", error);
-    setMessage(authMessage, "Firebase could not be loaded. Check your connection and try again.", true);
-  });
-} else {
-  setMessage(authMessage, "Set up Firebase using README.md to enable sign-in and shared inventory.", true);
-}
+loadInventory();
+renderStock();

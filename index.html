@@ -4,71 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17251e" />
-    <title>Thread &amp; Needle | Inventory</title>
+    <title>AR FACTIONS | Inventory</title>
+    <script>
+      try {
+        if (!sessionStorage.getItem("ar-factions-session")) {
+          window.location.replace("./login.html");
+        }
+      } catch (error) {
+        window.location.replace("./login.html");
+      }
+    </script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#" aria-label="Thread and Needle home">
-          <span class="brand-mark" aria-hidden="true">T</span>
-          <span>THREAD <span class="brand-amp">&amp;</span> NEEDLE</span>
+        <a class="brand" href="#" aria-label="AR FACTIONS home">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <span>AR FACTIONS</span>
         </a>
-        <button id="sign-out-button" class="button button-quiet hidden" type="button">Sign out</button>
+        <button id="sign-out-button" class="button button-quiet" type="button">Sign out</button>
       </header>
 
-      <section id="auth-view" class="auth-layout">
-        <div class="auth-copy">
-          <p class="eyebrow">YOUR STORE, IN SYNC</p>
-          <h1>Keep your stock<br />in good hands.</h1>
-          <p class="muted">Scan items in and out. See what is on the shelf, wherever you are.</p>
-          <div class="auth-decoration" aria-hidden="true">
-            <span class="thread-line"></span>
-            <span class="thread-dot"></span>
-            <span class="thread-line short"></span>
-          </div>
-        </div>
-        <div class="panel auth-panel">
-          <p class="eyebrow" id="auth-eyebrow">WELCOME BACK</p>
-          <h2 id="auth-title">Sign in</h2>
-          <p class="muted" id="auth-description">Sign in to manage your store inventory.</p>
-          <form id="auth-form">
-            <label for="email">Email address</label>
-            <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourstore.com" required />
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="At least 6 characters" required />
-            <button id="auth-submit" class="button button-primary full-width" type="submit">Sign in</button>
-          </form>
-          <p id="auth-message" class="message" role="status" aria-live="polite"></p>
-          <p class="switch-auth">
-            <span id="auth-switch-prompt">New to your store?</span>
-            <button id="auth-switch" class="text-button" type="button">Create an account</button>
-          </p>
-        </div>
-      </section>
-
-      <section id="dashboard-view" class="content-view hidden">
+      <section id="dashboard-view" class="content-view">
         <div class="page-heading">
-          <p class="eyebrow">STORE INVENTORY</p>
+          <p class="eyebrow">LOCAL INVENTORY</p>
           <h1>What would you like to do?</h1>
-          <p class="muted">Choose an action to update or check your stock.</p>
+          <p class="muted">Inventory is saved on this device in this browser.</p>
         </div>
         <div class="action-grid">
-          <button class="action-card" data-action="stock-in" type="button">
+          <button class="action-card" data-action="stock-in" onclick="openAction('stock-in')" type="button">
             <span class="card-icon icon-in" aria-hidden="true">↓</span>
             <span class="card-number">01 / STOCK IN</span>
             <span class="card-title">Scan stock</span>
             <span class="card-description">Add incoming items by barcode.</span>
             <span class="card-arrow" aria-hidden="true">↗</span>
           </button>
-          <button class="action-card" data-action="stock-out" type="button">
+          <button class="action-card" data-action="stock-out" onclick="openAction('stock-out')" type="button">
             <span class="card-icon icon-out" aria-hidden="true">↑</span>
             <span class="card-number">02 / SALES</span>
             <span class="card-title">Sale</span>
             <span class="card-description">Record sold items by barcode.</span>
             <span class="card-arrow" aria-hidden="true">↗</span>
           </button>
-          <button class="action-card" data-action="stock-view" type="button">
+          <button class="action-card" data-action="stock-view" onclick="openAction('stock-view')" type="button">
             <span class="card-icon icon-view" aria-hidden="true">▤</span>
             <span class="card-number">03 / OVERVIEW</span>
             <span class="card-title">Stock quantity</span>
@@ -79,7 +58,7 @@
       </section>
 
       <section id="category-view" class="content-view hidden">
-        <button class="back-button" data-back="dashboard" type="button"><span aria-hidden="true">←</span> Back</button>
+        <button class="back-button" data-back="dashboard" onclick="goBack('dashboard')" type="button"><span aria-hidden="true">←</span> Back</button>
         <div class="page-heading compact-heading">
           <p class="eyebrow" id="category-mode-label">STOCK IN</p>
           <h1>Choose a category</h1>
@@ -89,7 +68,7 @@
       </section>
 
       <section id="scanner-view" class="content-view hidden">
-        <button class="back-button" data-back="categories" type="button"><span aria-hidden="true">←</span> Back</button>
+        <button class="back-button" data-back="categories" onclick="goBack('categories')" type="button"><span aria-hidden="true">←</span> Back</button>
         <div class="scanner-layout">
           <div>
             <p class="eyebrow" id="scanner-mode-label">STOCK IN</p>
@@ -114,11 +93,11 @@
       </section>
 
       <section id="stock-view" class="content-view hidden">
-        <button class="back-button" data-back="dashboard" type="button"><span aria-hidden="true">←</span> Back</button>
+        <button class="back-button" data-back="dashboard" onclick="goBack('dashboard')" type="button"><span aria-hidden="true">←</span> Back</button>
         <div class="page-heading compact-heading">
-          <p class="eyebrow">LIVE INVENTORY</p>
+          <p class="eyebrow">LOCAL INVENTORY</p>
           <h1>Stock quantity</h1>
-          <p class="muted">Totals update automatically when anyone records a scan.</p>
+          <p class="muted">Totals are stored locally in this browser on this device.</p>
         </div>
         <div class="table-wrap">
           <table>
@@ -136,8 +115,9 @@
         <p id="stock-message" class="message" role="status" aria-live="polite"></p>
       </section>
 
-      <footer class="footer"><span>THREAD &amp; NEEDLE</span><span>Inventory made simple.</span></footer>
+      <footer class="footer"><span>AR FACTIONS</span><span>Inventory made simple.</span></footer>
     </main>
-    <script type="module" src="./app.js"></script>
+    <script src="./node_modules/@zxing/browser/umd/zxing-browser.min.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>

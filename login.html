@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#17251e" />
+    <title>Sign in | AR FACTIONS</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./login.html" aria-label="AR FACTIONS home">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <span>AR FACTIONS</span>
+        </a>
+      </header>
+
+      <section class="login-layout">
+        <div class="login-copy">
+          <p class="eyebrow">LOCAL INVENTORY</p>
+          <h1>Welcome to<br />your store.</h1>
+          <p class="muted">Sign in to manage your inventory on this device.</p>
+        </div>
+        <div class="login-panel">
+          <p class="eyebrow" id="login-eyebrow">YOUR ACCOUNT</p>
+          <h2 id="login-title">Sign in</h2>
+          <p class="muted login-description" id="login-description">Enter your email and password to continue.</p>
+          <form id="login-form">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters" required />
+            <button id="login-submit" class="button button-primary full-width" type="submit">Sign in</button>
+          </form>
+          <p id="login-message" class="message" role="status" aria-live="polite"></p>
+          <p class="switch-login">
+            <span id="login-switch-prompt">New here?</span>
+            <button id="login-switch" class="text-button" type="button">Create a local account</button>
+          </p>
+          <p class="local-auth-note">Accounts are saved only in this browser on this device. This local login is not secure authentication and does not sync across devices.</p>
+        </div>
+      </section>
+
+      <footer class="footer"><span>AR FACTIONS</span><span>Inventory made simple.</span></footer>
+    </main>
+    <script src="./login.js"></script>
+  </body>
+</html>
