@@ -5,6 +5,7 @@ const categories = [
   { id: "track-shirts", name: "Track shirts" },
 ];
 
+const loginView = document.querySelector("#login-view");
 const views = {
   dashboard: document.querySelector("#dashboard-view"),
   categories: document.querySelector("#category-view"),
@@ -36,6 +37,9 @@ function createEmptyInventory() {
 }
 
 function showView(name) {
+  if (loginView) {
+    loginView.classList.toggle("hidden", name !== "login");
+  }
   for (const [viewName, element] of Object.entries(views)) {
     element.classList.toggle("hidden", viewName !== name);
   }
@@ -280,11 +284,144 @@ async function scanVideoFrame() {
   }
 }
 
+const accountStorageKey = "ar-factions-local-accounts";
+const sessionStorageKey = "ar-factions-session";
+const iterations = 120000;
+const loginForm = document.querySelector("#login-form");
+const emailInput = document.querySelector("#email");
+const passwordInput = document.querySelector("#password");
+const submitButton = document.querySelector("#login-submit");
+const switchButton = document.querySelector("#login-switch");
+const loginMessage = document.querySelector("#login-message");
+let creatingAccount = false;
+
+function hasSession() {
+  try {
+    return Boolean(sessionStorage.getItem(sessionStorageKey));
+  } catch (error) {
+    return false;
+  }
+}
+
+function setLoginMessage(text, isError = false) {
+  if (!loginMessage) return;
+  loginMessage.textContent = text;
+  loginMessage.classList.toggle("error", isError);
+}
+
+function renderLoginMode() {
+  const eyebrow = document.querySelector("#login-eyebrow");
+  const title = document.querySelector("#login-title");
+  const description = document.querySelector("#login-description");
+  const switchPrompt = document.querySelector("#login-switch-prompt");
+  if (!eyebrow || !title || !description || !switchPrompt || !switchButton || !submitButton || !passwordInput) return;
+
+  eyebrow.textContent = creatingAccount ? "CREATE ACCOUNT" : "YOUR ACCOUNT";
+  title.textContent = creatingAccount ? "Create account" : "Sign in";
+  description.textContent = creatingAccount
+    ? "Create a local account for this browser."
+    : "Enter your email and password to continue.";
+  switchPrompt.textContent = creatingAccount ? "Already registered?" : "New here?";
+  switchButton.textContent = creatingAccount ? "Sign in" : "Create a local account";
+  submitButton.textContent = creatingAccount ? "Create account" : "Sign in";
+  passwordInput.autocomplete = creatingAccount ? "new-password" : "current-password";
+  setLoginMessage("");
+}
+
+function readAccounts() {
+  const saved = localStorage.getItem(accountStorageKey);
+  if (!saved) return [];
+  const accounts = JSON.parse(saved);
+  if (!Array.isArray(accounts)) throw new Error("Stored accounts are invalid.");
+  return accounts;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hashPassword(password, salt) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    salt: encoder.encode(salt),
+    iterations,
+    hash: "SHA-256",
+  }, key, 256);
+  return bytesToHex(new Uint8Array(bits));
+}
+
+function syncAuthView() {
+  const loggedIn = hasSession();
+  signOutButton.classList.toggle("hidden", !loggedIn);
+  showView(loggedIn ? "dashboard" : "login");
+}
+
+if (switchButton) {
+  switchButton.addEventListener("click", () => {
+    creatingAccount = !creatingAccount;
+    renderLoginMode();
+  });
+}
+
+if (loginForm) {
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim().toLowerCase();
+    const password = passwordInput.value;
+    submitButton.disabled = true;
+    setLoginMessage(creatingAccount ? "Creating local account…" : "Signing in…");
+
+    try {
+      if (!crypto.subtle) {
+        throw new Error("Secure password hashing is unavailable. Use localhost or HTTPS.");
+      }
+      const accounts = readAccounts();
+      const account = accounts.find((entry) => entry.email === email);
+
+      if (creatingAccount) {
+        if (account) {
+          setLoginMessage("An account already exists for this email. Please sign in.", true);
+          return;
+        }
+        const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+        const passwordHash = await hashPassword(password, salt);
+        accounts.push({ email, salt, passwordHash, iterations });
+        localStorage.setItem(accountStorageKey, JSON.stringify(accounts));
+      } else {
+        if (!account) {
+          setLoginMessage("No local account was found. Create an account on this device first.", true);
+          return;
+        }
+        const passwordHash = await hashPassword(password, account.salt);
+        if (passwordHash !== account.passwordHash) {
+          setLoginMessage("Email or password is incorrect.", true);
+          return;
+        }
+      }
+
+      sessionStorage.setItem(sessionStorageKey, email);
+      syncAuthView();
+    } catch (error) {
+      console.error("Could not complete local sign-in:", error);
+      setLoginMessage(
+        error.name === "QuotaExceededError"
+          ? "Browser storage is full. Free up space and try again."
+          : error.message || "Sign-in could not be completed.",
+        true,
+      );
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+}
+
 cameraButton.addEventListener("click", () => void startCamera());
 signOutButton.addEventListener("click", () => {
   try {
-    sessionStorage.removeItem("ar-factions-session");
-    window.location.replace("./login.html");
+    sessionStorage.removeItem(sessionStorageKey);
+    syncAuthView();
   } catch (error) {
     console.error("Could not sign out:", error);
     alert("Could not sign out. Close this tab and reopen the app.");
@@ -294,3 +431,5 @@ signOutButton.addEventListener("click", () => {
 renderCategories();
 loadInventory();
 renderStock();
+renderLoginMode();
+syncAuthView();

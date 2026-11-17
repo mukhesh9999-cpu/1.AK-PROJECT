@@ -7,6 +7,7 @@ const passwordInput = document.querySelector("#password");
 const submitButton = document.querySelector("#login-submit");
 const switchButton = document.querySelector("#login-switch");
 const message = document.querySelector("#login-message");
+const appUrl = new URL("./index.html", document.currentScript.src);
 let creatingAccount = false;
 
 function setMessage(text, isError = false) {
@@ -92,7 +93,7 @@ loginForm.addEventListener("submit", async (event) => {
     }
 
     sessionStorage.setItem(sessionStorageKey, email);
-    window.location.replace("./index.html");
+    window.location.replace(appUrl.href);
   } catch (error) {
     console.error("Could not complete local sign-in:", error);
     setMessage(error.name === "QuotaExceededError"

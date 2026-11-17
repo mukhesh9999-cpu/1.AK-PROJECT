@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite (typically `http://127.0.0.1:5173`). The app opens at `login.html`; use **Create a local account** the first time, then sign in. The dashboard, category selection, and stock overview also work from the local server. Camera scanning requires a supported browser and a secure context, so use the local server for camera access.
+Open the local URL printed by Vite (typically `http://127.0.0.1:5173`). The app runs from a single `index.html` page, with the local sign-in and inventory dashboard in one view; use **Create a local account** the first time, then sign in. The dashboard, category selection, and stock overview also work from the local server. Camera scanning requires a supported browser and a secure context, so use the local server for camera access.
 
 ## Inventory and privacy
 

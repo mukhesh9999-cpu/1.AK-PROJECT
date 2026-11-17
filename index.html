@@ -5,15 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17251e" />
     <title>AR FACTIONS | Inventory</title>
-    <script>
-      try {
-        if (!sessionStorage.getItem("ar-factions-session")) {
-          window.location.replace("./login.html");
-        }
-      } catch (error) {
-        window.location.replace("./login.html");
-      }
-    </script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -23,10 +14,36 @@
           <span class="brand-mark" aria-hidden="true">A</span>
           <span>AR FACTIONS</span>
         </a>
-        <button id="sign-out-button" class="button button-quiet" type="button">Sign out</button>
+        <button id="sign-out-button" class="button button-quiet hidden" type="button">Sign out</button>
       </header>
 
-      <section id="dashboard-view" class="content-view">
+      <section id="login-view" class="content-view login-layout">
+        <div class="login-copy">
+          <p class="eyebrow">LOCAL INVENTORY</p>
+          <h1>Welcome to<br />your store.</h1>
+          <p class="muted">Sign in to manage your inventory on this device.</p>
+        </div>
+        <div class="login-panel">
+          <p class="eyebrow" id="login-eyebrow">YOUR ACCOUNT</p>
+          <h2 id="login-title">Sign in</h2>
+          <p class="muted login-description" id="login-description">Enter your email and password to continue.</p>
+          <form id="login-form">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters" required />
+            <button id="login-submit" class="button button-primary full-width" type="submit">Sign in</button>
+          </form>
+          <p id="login-message" class="message" role="status" aria-live="polite"></p>
+          <p class="switch-login">
+            <span id="login-switch-prompt">New here?</span>
+            <button id="login-switch" class="text-button" type="button">Create a local account</button>
+          </p>
+          <p class="local-auth-note">Accounts are saved only in this browser on this device. This local login is not secure authentication and does not sync across devices.</p>
+        </div>
+      </section>
+
+      <section id="dashboard-view" class="content-view hidden">
         <div class="page-heading">
           <p class="eyebrow">LOCAL INVENTORY</p>
           <h1>What would you like to do?</h1>
